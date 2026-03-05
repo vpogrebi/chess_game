@@ -1,0 +1,48 @@
+{% extends 'chess/base.html' %}
+
+{% block title %}Chess Game - Home{% endblock %}
+
+{% block content %}
+<div style="text-align: center; padding: 50px 20px;">
+    <h2 style="color: #2c3e50; margin-bottom: 30px; font-size: 2.5em;">Welcome to Chess Game</h2>
+    
+    <div style="max-width: 600px; margin: 0 auto; line-height: 1.6;">
+        <p style="font-size: 1.2em; color: #555; margin-bottom: 40px;">
+            Experience the classic game of chess with a beautiful web interface. 
+            Play against a friend on the same device with full chess rules implementation.
+        </p>
+        
+        <div style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap;">
+            <a href="{% url 'chess:create_game' %}" class="btn" style="font-size: 1.1em; padding: 15px 30px;">
+                🎮 Start New Game
+            </a>
+            
+            <a href="{% url 'chess:game_list' %}" class="btn" style="font-size: 1.1em; padding: 15px 30px;">
+                📋 View Games
+            </a>
+        </div>
+    </div>
+    
+    <div style="margin-top: 60px; padding: 30px; background: #f8f9fa; border-radius: 10px;">
+        <h3 style="color: #2c3e50; margin-bottom: 20px;">Features:</h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; text-align: left;">
+            <div>
+                <h4 style="color: #667eea; margin-bottom: 10px;">♟️ Full Chess Rules</h4>
+                <p style="color: #666; font-size: 0.9em;">Complete implementation including castling, en passant, and pawn promotion</p>
+            </div>
+            <div>
+                <h4 style="color: #667eea; margin-bottom: 10px;">🎨 Beautiful UI</h4>
+                <p style="color: #666; font-size: 0.9em;">Wood-style board with traditional chess pieces</p>
+            </div>
+            <div>
+                <h4 style="color: #667eea; margin-bottom: 10px;">⚡ Real-time</h4>
+                <p style="color: #666; font-size: 0.9em;">Instant move validation and game state updates</p>
+            </div>
+            <div>
+                <h4 style="color: #667eea; margin-bottom: 10px;">🏆 Game Tracking</h4>
+                <p style="color: #666; font-size: 0.9em;">Check/checkmate detection and move history</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

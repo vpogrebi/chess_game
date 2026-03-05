@@ -1,0 +1,82 @@
+{% extends 'chess/base.html' %}
+
+{% block title %}Game List{% endblock %}
+
+{% block content %}
+<div style="padding: 20px;">
+    <h2 style="color: #2c3e50; margin-bottom: 30px;">All Games</h2>
+    
+    {% if games %}
+        <div style="display: grid; gap: 20px;">
+            {% for game in games %}
+                <div style="background: #f8f9fa; padding: 20px; border-radius: 10px; border-left: 4px solid #667eea;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+                        <div>
+                            <h3 style="margin: 0 0 10px 0; color: #2c3e50;">
+                                {{ game.name }} - {{ game.started_at|date:"Y-m-d H:i:s"|default:"Not Started" }}
+                            </h3>
+                            <p style="margin: 5px 0; color: #666;">
+                                <strong>{{ game.white_player.full_name }}</strong> vs <strong>{{ game.black_player.full_name }}</strong>
+                            </p>
+                            <p style="margin: 5px 0; color: #888; font-size: 0.9em;">
+                                Created: {{ game.created_at|date:"M d, Y H:i" }}
+                            </p>
+                            {% if game.started_at %}
+                                <p style="margin: 5px 0; color: #888; font-size: 0.9em;">
+                                    Started: {{ game.started_at|date:"M d, Y H:i" }}
+                                </p>
+                            {% endif %}
+                        </div>
+                        
+                        <div style="text-align: right;">
+                            <div style="margin-bottom: 10px;">
+                                <span class="status-badge status-{{ game.status }}">
+                                    {{ game.get_status_display }}
+                                </span>
+                            </div>
+                            
+                            {% if game.current_turn and game.status not in 'checkmate,stalemate,resigned,draw' %}
+                                <p style="margin: 5px 0; color: #666; font-size: 0.9em;">
+                                    Turn: <strong>{{ game.current_turn|title }}</strong>
+                                </p>
+                            {% endif %}
+                            
+                            {% if game.winner %}
+                                <p style="margin: 5px 0; color: #28a745; font-weight: bold;">
+                                    🏆 Winner: {{ game.winner.full_name }}
+                                </p>
+                            {% endif %}
+                            
+                            <a href="{% url 'chess:game' game.id %}" class="btn" style="margin-top: 10px;">
+                                Play Game
+                            </a>
+                            
+                            <form method="post" action="{% url 'chess:delete_game' game.id %}" style="display: inline; margin-left: 10px;">
+                                {% csrf_token %}
+                                <button type="submit" class="btn" style="background: #dc3545; margin-top: 10px;">
+                                    🗑️ Delete
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div style="text-align: center; padding: 60px 20px; background: #f8f9fa; border-radius: 15px;">
+            <h3 style="color: #666; margin-bottom: 20px;">No games yet</h3>
+            <p style="color: #999; margin-bottom: 30px;">Start your first chess game!</p>
+            <a href="{% url 'chess:create_game' %}" class="btn">
+                Create New Game
+            </a>
+        </div>
+    {% endif %}
+    
+    <div style="margin-top: 30px;">
+        <a href="{% url 'chess:home' %}" style="color: #667eea; text-decoration: none;">
+            ← Back to Home
+        </a>
+    </div>
+</div>
+
+{% endblock %}

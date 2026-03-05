@@ -1,0 +1,1579 @@
+{% extends 'chess/base.html' %}
+
+{% block title %}{{ game.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .game-container {
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+        gap: 30px;
+        min-height: 100vh;
+        padding: 20px;
+    }
+    
+    .board-section {
+        flex: 0 0 auto;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .info-section {
+        flex: 0 0 300px;
+    }
+    
+    .chess-board {
+        display: grid;
+        grid-template-columns: repeat(8, 75px); /* Fixed column width */
+        grid-template-rows: repeat(8, 75px); /* Fixed row height */
+        width: 600px;
+        height: 600px;
+        border: 3px solid #2c3e50;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+        flex-shrink: 0; /* Prevent shrinking */
+    }
+    
+    .square {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        position: relative;
+        font-size: 3em; /* Fixed font size, no viewport-based scaling */
+        width: 75px; /* Fixed width: 600px / 8 */
+        height: 75px; /* Fixed height: 600px / 8 */
+        flex-shrink: 0; /* Prevent shrinking */
+        box-sizing: border-box;
+    }
+    
+    .square.light {
+        background: linear-gradient(135deg, #f0d9b5 0%, #e6cc99 100%);
+    }
+    
+    .square.dark {
+        background: linear-gradient(135deg, #b58863 0%, #8b6914 100%);
+    }
+    
+    .square:hover {
+        filter: brightness(1.1);
+    }
+    
+    .square.selected {
+        background: linear-gradient(135deg, #7fc97f 0%, #4daf4a 100%) !important;
+        box-shadow: inset 0 0 20px rgba(0,0,0,0.3);
+    }
+    
+    .square.valid-move {
+        position: relative;
+    }
+    
+    .square.valid-move::after {
+        content: '';
+        position: absolute;
+        width: 30%;
+        height: 30%;
+        background: rgba(76, 175, 80, 0.8);
+        border-radius: 50%;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+    }
+    
+    .square.valid-capture::after {
+        content: '';
+        position: absolute;
+        width: 90%;
+        height: 90%;
+        border: 3px solid rgba(244, 67, 54, 0.8);
+        border-radius: 50%;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+    }
+    
+    .square.en-passant-move {
+        position: relative;
+    }
+    
+    .square.en-passant-move::after {
+        content: '';
+        position: absolute;
+        width: 30%;
+        height: 30%;
+        background: rgba(255, 165, 0, 0.8);
+        border-radius: 50%;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+    }
+    
+    .square.castling-move {
+        position: relative;
+    }
+    
+    .square.castling-move::after {
+        content: '';
+        position: absolute;
+        width: 40%;
+        height: 40%;
+        background: rgba(255, 140, 0, 0.9);
+        border: 2px solid rgba(255, 69, 0, 1);
+        border-radius: 50%;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        box-shadow: 0 0 10px rgba(255, 140, 0, 0.6);
+    }
+    
+    .square.en-passant-capture::after {
+        content: '';
+        position: absolute;
+        width: 90%;
+        height: 90%;
+        border: 3px solid rgba(255, 165, 0, 0.8);
+        border-radius: 50%;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+    }
+    
+    .square.checked-king::after {
+        content: '';
+        position: absolute;
+        width: 90%;
+        height: 90%;
+        border: 4px solid rgba(255, 0, 0, 0.9);
+        border-radius: 50%;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        animation: pulse 1.5s infinite;
+    }
+    
+    @keyframes pulse {
+        0% { opacity: 1; }
+        50% { opacity: 0.5; }
+        100% { opacity: 1; }
+    }
+    
+    .check-notification {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: rgba(255, 0, 0, 0.9);
+        color: white;
+        padding: 15px 20px;
+        border-radius: 8px;
+        font-weight: bold;
+        font-size: 16px;
+        z-index: 1000;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        animation: slideIn 0.3s ease-out;
+    }
+    
+    @keyframes slideIn {
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+    
+    .piece {
+        user-select: none;
+        filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.3));
+        /* Remove transition to prevent resizing effects */
+    }
+    
+    .piece:hover {
+        transform: scale(1.05); /* Reduce scale to prevent layout shifts */
+    }
+    
+    .coordinates {
+        display: flex;
+        justify-content: space-around;
+        margin-top: 5px;
+        font-weight: bold;
+        color: #2c3e50;
+    }
+    
+    .rank-labels {
+        position: absolute;
+        left: -25px;
+        top: 0;
+        height: 600px; /* Match board height */
+        display: flex;
+        flex-direction: column;
+        justify-content: space-around;
+        font-weight: bold;
+        color: #2c3e50;
+        align-items: center;
+    }
+    
+    .rank-labels span {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 75px; /* Match square height */
+        width: 25px; /* Fixed width for rank labels */
+        flex-shrink: 0;
+    }
+    
+    .board-wrapper {
+        position: relative;
+        display: flex;
+        align-items: center;
+    }
+    
+    .game-info {
+        background: #f8f9fa;
+        padding: 20px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+    }
+    
+    .status-message {
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        font-weight: bold;
+        text-align: center;
+    }
+    
+    .status-active {
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+    
+    .status-check {
+        background: #fff3cd;
+        color: #856404;
+        border: 1px solid #ffeaa7;
+    }
+    
+    .status-checkmate {
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+    
+    .captured-pieces {
+        background: white;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        min-height: 60px;
+    }
+    
+    .captured-piece {
+        display: inline-block;
+        font-size: 1.5em;
+        margin: 2px;
+        opacity: 0.7;
+    }
+    
+    .move-history {
+        background: white;
+        padding: 15px;
+        border-radius: 8px;
+        max-height: 300px;
+        overflow-y: auto;
+    }
+    
+    .move-history-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-family: monospace;
+    }
+    
+    .move-history-table th {
+        background: #f8f9fa;
+        padding: 8px;
+        text-align: left;
+        border-bottom: 2px solid #dee2e6;
+        font-weight: bold;
+    }
+    
+    .move-history-table td {
+        padding: 6px 8px;
+        border-bottom: 1px solid #eee;
+    }
+    
+    .move-history-table tr:nth-child(even) {
+        background: #f8f9fa;
+    }
+    
+    .move-item {
+        padding: 5px;
+        border-bottom: 1px solid #eee;
+        font-family: monospace;
+    }
+    
+    .move-pair {
+        display: flex;
+        border-bottom: 1px solid #eee;
+        padding: 5px;
+        margin: 2px 0;
+    }
+    
+    .move-number {
+        min-width: 60px;
+        font-weight: bold;
+    }
+    
+    .white-move {
+        background: transparent;
+        color: #333;
+        padding: 5px 10px 5px 10px;
+        border-left: 3px solid #ddd;
+        flex: 1;
+    }
+    
+    .black-move {
+        background: transparent;
+        color: #333;
+        padding: 5px 10px 5px 10px;
+        border-left: 3px solid #ddd;
+        flex: 1;
+    }
+    
+    .white-move-placeholder, .black-move-placeholder {
+        min-width: 100px;
+        flex: 1;
+    }
+    
+    .promotion-modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.7);
+        z-index: 1000;
+        justify-content: center;
+        align-items: center;
+    }
+    
+    .promotion-content {
+        background: white;
+        padding: 30px;
+        border-radius: 15px;
+        text-align: center;
+    }
+    
+    .promotion-pieces {
+        display: flex;
+        gap: 20px;
+        justify-content: center;
+        margin-top: 20px;
+    }
+    
+    .promotion-piece {
+        font-size: 3em;
+        cursor: pointer;
+        padding: 10px;
+        border-radius: 8px;
+        transition: all 0.2s;
+    }
+    
+    .promotion-piece.selected-piece {
+        background: #f0f0f0;
+        transform: scale(1.2);
+    }
+    
+    /* Check indicator styles */
+    .check-indicator {
+        position: absolute;
+        top: -8px;
+        right: -8px;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: bold;
+        color: white;
+        z-index: 10;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+    
+    .check-warning {
+        background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+        border: 2px solid #e65100;
+    }
+    
+    .checked-king {
+        background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+        border: 2px solid #e65100;
+        color: white;
+    }
+    
+    .checkmate-king {
+        background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
+        border: 2px solid #b71c1c;
+    }
+    
+    .winner-king {
+        background: linear-gradient(135deg, #4caf50 0%, #388e3c 100%);
+        border: 2px solid #2e7d32;
+    }
+    
+    .stalemate-king {
+        background: linear-gradient(135deg, #ffeb3b 0%, #ffc107 100%);
+        border: 2px solid #ff9800;
+        color: #333;
+    }
+    
+    .stalemate-cell {
+        background-color: rgba(255, 152, 0, 0.3) !important;
+        border: 2px solid #ff9800;
+    }
+    
+    .status-draw {
+        background: linear-gradient(135deg, #ffeb3b 0%, #ffc107 100%);
+        color: white;
+        padding: 10px 15px;
+        border-radius: 5px;
+        font-weight: bold;
+    }
+    
+    .game-controls {
+        display: flex;
+        gap: 10px;
+        margin-top: 15px;
+        justify-content: center;
+    }
+    
+    .btn-danger {
+        background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-weight: bold;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-danger:hover {
+        background: linear-gradient(135deg, #d32f2f 0%, #b71c1c 100%);
+        transform: translateY(-2px);
+    }
+    
+    .btn-warning {
+        background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-weight: bold;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-warning:hover {
+        background: linear-gradient(135deg, #f57c00 0%, #e65100 100%);
+        transform: translateY(-2px);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="game-container">
+    <div class="board-section">
+        <div class="board-wrapper">
+            <div class="rank-labels">
+                <span>8</span><span>7</span><span>6</span><span>5</span>
+                <span>4</span><span>3</span><span>2</span><span>1</span>
+            </div>
+            <div>
+                <div class="chess-board" id="chess-board">
+                    {% for row in board %}
+                        {% for cell in row %}
+                            <div class="square {% if forloop.counter0|divisibleby:2 == forloop.parentloop.counter0|divisibleby:2 %}light{% else %}dark{% endif %}" 
+                                 data-x="{{ forloop.counter0 }}" 
+                                 data-y="{{ cell.db_y }}">
+                                {% if cell.piece %}
+                                    <span class="piece" data-color="{{ cell.piece.color }}" data-type="{{ cell.piece.type }}">
+                                        {{ cell.piece.get_unicode_symbol }}
+                                    </span>
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+                    {% endfor %}
+                </div>
+                <div class="coordinates">
+                    <span>a</span><span>b</span><span>c</span><span>d</span>
+                    <span>e</span><span>f</span><span>g</span><span>h</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="info-section">
+        <div class="game-info">
+            <h3>{{ game.name }}</h3>
+            {% if game.status == 'waiting' %}
+                <button id="start-game-btn" class="btn" style="width: 100%; margin-top: 15px;">
+                    Start Game
+                </button>
+            {% endif %}
+        </div>
+        
+        <div id="status-message" class="status-message 
+            {% if game.status == 'active' %}status-active
+            {% elif game.status == 'check' %}status-check
+            {% elif game.status == 'checkmate' %}status-checkmate
+            {% endif %}">
+            {% if game.status == 'waiting' %}
+                Game waiting to start
+            {% elif game.status == 'active' %}
+                {{ game.current_turn|title }}'s turn to move
+            {% elif game.status == 'check' %}
+                {{ game.current_turn|title }} is in CHECK!
+            {% elif game.status == 'checkmate' %}
+                CHECKMATE! {{ game.winner.full_name }} wins!
+            {% elif game.status == 'stalemate' %}
+                STALEMATE! Game is a draw.
+            {% endif %}
+        </div>
+        
+        <!-- Game Control Buttons -->
+        {% if game.status == 'active' or game.status == 'check' %}
+        <div class="game-controls">
+            <button id="resign-btn" class="btn btn-danger">Resign</button>
+            <button id="draw-btn" class="btn btn-warning">Offer Draw</button>
+        </div>
+        {% endif %}
+                <div class="captured-pieces">
+                    <div id="white-captures">
+                        <h3>White Captures</h3>
+                        <div id="white-captures-list"></div>
+                    </div>
+                    <div id="black-captures">
+                        <h3>Black Captures</h3>
+                        <div id="black-captures-list"></div>
+                    </div>
+                </div>
+                <div class="move-history">
+                    <h4>Move History:</h4>
+                    <table class="move-history-table">
+                        <thead>
+                            <tr>
+                                <th>Move</th>
+                                <th>White</th>
+                                <th>Black</th>
+                            </tr>
+                        </thead>
+                        <tbody id="move-history-tbody">
+                            <!-- Moves will be added dynamically by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="promotion-modal" class="promotion-modal">
+        <div class="promotion-content">
+            <h2>Choose Promotion Piece</h2>
+            <div class="promotion-pieces">
+                <span class="promotion-piece" data-piece="queen">♕</span>
+                <span class="promotion-piece" data-piece="rook">♖</span>
+                <span class="promotion-piece" data-piece="bishop">♗</span>
+                <span class="promotion-piece" data-piece="knight">♘</span>
+            </div>
+            <button id="cancel-promotion">Cancel</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const gameId = {{ game.id }};
+let selectedSquare = null;
+let currentPlayer = '{{ game.current_turn }}';
+let gameStatus = '{{ game.status }}';
+let pendingMove = null;
+let board = null; // Global board variable
+
+// Initialize board function
+function initializeBoard() {
+    board = document.getElementById('chess-board');
+    const squares = board.querySelectorAll('.square');
+    
+    squares.forEach(square => {
+        square.addEventListener('click', handleSquareClick);
+    });
+    
+    // Start game button
+    const startBtn = document.getElementById('start-game-btn');
+    if (startBtn) {
+        startBtn.addEventListener('click', startGame);
+    }
+    
+    // Promotion modal
+    const promotionModal = document.getElementById('promotion-modal');
+    const promotionPieces = document.querySelectorAll('.promotion-piece');
+    
+    promotionPieces.forEach(piece => {
+        piece.addEventListener('click', handlePromotion);
+    });
+    
+    const cancelPromotionBtn = document.getElementById('cancel-promotion');
+    if (cancelPromotionBtn) {
+        cancelPromotionBtn.addEventListener('click', hidePromotionModal);
+    }
+}
+
+// Initialize board - CONSOLIDATED SINGLE EVENT LISTENER
+document.addEventListener('DOMContentLoaded', function() {
+    initializeBoard();
+    populateExistingMoves();
+    checkForCheck();
+    
+    // Add event listeners to squares
+    const squares = board.querySelectorAll('.square');
+    squares.forEach(square => {
+        square.addEventListener('click', handleSquareClick);
+    });
+    
+    // Start game button
+    const startBtn = document.getElementById('start-game-btn');
+    if (startBtn) {
+        startBtn.addEventListener('click', startGame);
+    }
+    
+    // Promotion modal
+    const promotionPieces = document.querySelectorAll('.promotion-piece');
+    promotionPieces.forEach(piece => {
+        piece.addEventListener('click', handlePromotion);
+    });
+    
+    const cancelPromotionBtn = document.getElementById('cancel-promotion');
+    if (cancelPromotionBtn) {
+        cancelPromotionBtn.addEventListener('click', hidePromotionModal);
+    }
+    
+    // Resign and Draw buttons
+    const resignBtn = document.getElementById('resign-btn');
+    const drawBtn = document.getElementById('draw-btn');
+    
+    if (resignBtn) {
+        resignBtn.addEventListener('click', handleResign);
+    }
+    
+    if (drawBtn) {
+        drawBtn.addEventListener('click', handleDraw);
+    }
+});
+
+function handleSquareClick(event) {
+    const square = event.currentTarget;
+    const piece = square.querySelector('.piece');
+    
+    // Check if game is over (checkmate or stalemate)
+    const statusElement = document.getElementById('status-message');
+    const gameStatus = statusElement ? statusElement.textContent : '';
+    const isGameOver = gameStatus.includes('CHECKMATE') || gameStatus.includes('STALEMATE') || gameStatus.includes('RESIGNED') || gameStatus.includes('DRAW');
+    
+    if (isGameOver) {
+        return; // Game is over - no moves allowed
+    }
+    
+    if (selectedSquare) {
+        // Try to make a move
+        if (selectedSquare !== square) {
+            makeMove(selectedSquare.dataset.x, selectedSquare.dataset.y, square.dataset.x, square.dataset.y);
+        }
+        clearSelection();
+    } else if (piece && piece.dataset.color === currentPlayer) {
+        selectSquare(square);
+        showValidMoves(parseInt(square.dataset.x), parseInt(square.dataset.y));
+    }
+}
+
+function selectSquare(square) {
+    clearSelection();
+    square.classList.add('selected');
+    selectedSquare = square;
+}
+
+function clearSelection() {
+    document.querySelectorAll('.square').forEach(sq => {
+        sq.classList.remove('selected', 'valid-move', 'valid-capture', 'en-passant-move', 'en-passant-capture', 'castling-move');
+    });
+    selectedSquare = null;
+}
+
+async function showValidMoves(x, y) {
+    try {
+        const response = await fetch(`/game/${gameId}/valid-moves/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrfToken(),
+            },
+            body: JSON.stringify({ x: parseInt(x), y: parseInt(y) })
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            data.moves.forEach((move, index) => {
+                const square = document.querySelector(`[data-x="${move.x}"][data-y="${move.y}"]`);
+                const piece = square.querySelector('.piece');
+                
+                // Check if this is a castling move (king moves 2 squares horizontally)
+                const selectedPiece = document.querySelector(`[data-x="${x}"][data-y="${y}"] .piece`);
+                const isKing = selectedPiece && selectedPiece.dataset.type === 'king';
+                const isCastling = isKing && Math.abs(move.x - parseInt(x)) === 2 && Math.abs(move.y - parseInt(y)) === 0;
+                
+                if (isCastling) {
+                    // Castling move - use orange highlighting to attract attention
+                    square.classList.add('castling-move');
+                } else if (move.is_en_passant) {
+                    // En passant capture - use orange markers
+                    square.classList.add('en-passant-move');
+                    
+                    // Also mark the vulnerable pawn with orange ring
+                    // For en passant, the vulnerable pawn is one rank behind the capture square
+                    // in the same direction as the capturing pawn's movement
+                    const selectedPiece = document.querySelector(`[data-x="${x}"][data-y="${y}"] .piece`);
+                    const isWhitePawn = selectedPiece && selectedPiece.dataset.color === 'white';
+                    
+                    // The vulnerable pawn is one rank behind the capture square
+                    const vulnerableX = move.x;
+                    const vulnerableY = isWhitePawn ? move.y - 1 : move.y + 1;
+                                       
+                    const vulnerableSquare = document.querySelector(`[data-x="${vulnerableX}"][data-y="${vulnerableY}"]`);
+                    
+                    if (vulnerableSquare) {
+                        vulnerableSquare.classList.add('en-passant-capture');
+                    }
+                } else if (piece) {
+                    square.classList.add('valid-capture');
+                } else {
+                    square.classList.add('valid-move');
+                }
+            });
+        }
+    } catch (error) {
+        console.error('Error getting valid moves:', error);
+    }
+}
+
+async function makeMove(fromX, fromY, toX, toY) {
+    try {
+        const moveData = {
+            from_x: parseInt(fromX),
+            from_y: parseInt(fromY),
+            to_x: parseInt(toX),
+            to_y: parseInt(toY)
+        };
+        
+        // Check for pawn promotion
+        const pieceElement = document.querySelector(`[data-x="${fromX}"][data-y="${fromY}"] .piece`);
+        if (pieceElement && pieceElement.dataset.type === 'pawn') {
+            const toYNum = parseInt(toY);
+            if ((pieceElement.dataset.color === 'white' && toYNum === 7) || 
+                (pieceElement.dataset.color === 'black' && toYNum === 0)) {
+                // Show promotion modal
+                pendingMove = moveData;
+                document.getElementById('promotion-modal').style.display = 'flex';
+                return;
+            }
+        }
+        
+        const response = await fetch(`/game/${gameId}/move/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrfToken(),
+            },
+            body: JSON.stringify(moveData)
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            try {
+                updateBoard(data.move);
+                updateGameStatus(data.game_status, data.current_turn, data.winner);
+                addMoveToHistory(data.move.notation);
+                // Check for checkmate/check after the move with slight delay
+                setTimeout(() => {
+                    checkForCheck(data.game_status, data.current_turn, data.winner);
+                }, 100);
+            } catch (boardError) {
+                location.reload();
+            }
+        } else {
+            alert('Invalid move: ' + (data.message || 'Unknown error'));
+        }
+    } catch (error) {
+        alert('Error making move: ' + error.message);
+    }
+}
+
+function handlePromotion(event) {
+    const piece = event.currentTarget;
+    const promotionType = piece.dataset.piece;
+    
+    if (pendingMove) {
+        pendingMove.promotion_piece = promotionType;
+        completePromotionMove();
+    }
+    
+    hidePromotionModal();
+}
+
+function hidePromotionModal() {
+    const promotionModal = document.getElementById('promotion-modal');
+    if (promotionModal) {
+        promotionModal.style.display = 'none';
+    }
+    pendingMove = null;
+}
+
+async function completePromotionMove() {
+    try {
+        const response = await fetch(`/game/${gameId}/move/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrfToken(),
+            },
+            body: JSON.stringify(pendingMove)
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            updateBoard(data.move);
+            updateGameStatus(data.game_status, data.current_turn, data.winner);
+            addMoveToHistory(data.move.notation);
+            
+            // Clear any existing check indicators immediately after move
+            document.querySelectorAll('.check-indicator').forEach(indicator => {
+                indicator.remove();
+            });
+            
+            // Check for check immediately after board update
+            if (data.game_status === 'check') {
+                const kingSquares = document.querySelectorAll('.piece');
+                kingSquares.forEach(square => {
+                    const piece = square; // square is already the piece element
+                    if (piece && piece.textContent.includes('♔') && data.current_turn === 'white' ||
+                        piece.textContent.includes('♚') && data.current_turn === 'black') {
+                        // Add orange bubble with '!' for checked king
+                        const checkIndicator = document.createElement('div');
+                        checkIndicator.className = 'check-indicator checked-king';
+                        checkIndicator.textContent = '!';
+                        square.appendChild(checkIndicator);
+                    }
+                });
+                
+                // Update game status to show check
+                updateGameStatus('check', data.current_turn, data.winner);
+            } else {
+                // Ensure game status is updated for non-check states
+                updateGameStatus(data.game_status, data.current_turn, data.winner);
+            }
+            
+            // Check for draw offers after the move
+            checkForDrawOffer();
+            
+            // Check for check/checkmate status after move completion
+            setTimeout(() => {
+                checkForCheck();
+            }, 300);
+            
+            // Re-initialize board event listeners after promotion
+            setTimeout(() => {
+                initializeBoard();
+            }, 100);
+        } else {
+            alert(data.message);
+        }
+        
+        pendingMove = null;
+    } catch (error) {
+        alert('Error making move');
+    }
+}
+
+function updateBoard(move) {
+    // Extract coordinates from nested move object structure
+    const fromX = move.from ? move.from.x : move.from_x;
+    const fromY = move.from ? move.from.y : move.from_y;
+    const toX = move.to ? move.to.x : move.to_x;
+    const toY = move.to ? move.to.y : move.to_y;
+    
+    const fromSquare = document.querySelector(`[data-x="${fromX}"][data-y="${fromY}"]`);
+    const toSquare = document.querySelector(`[data-x="${toX}"][data-y="${toY}"]`);
+    
+    if (!fromSquare) {
+        throw new Error('Source square not found');
+    }
+    
+    if (!toSquare) {
+        throw new Error('Destination square not found');
+    }
+    
+    // Check if this is a castling move (king moves 2 squares horizontally)
+    // We'll detect castling by finding the piece at the from position
+    const piece = fromSquare.querySelector('.piece');
+    const isCastling = Math.abs(toX - fromX) === 2 && piece && piece.dataset.type === 'king';
+    
+    if (isCastling) {
+        // For castling moves, refresh the entire board to show rook movement
+        // Increased delay to allow rook database update to complete
+        setTimeout(() => location.reload(), 500);
+        return;
+    }
+    
+    // Try multiple ways to find piece
+    if (!piece) {
+        piece = fromSquare.querySelector('span');
+    }
+    if (!piece) {
+        piece = fromSquare.querySelector('[class*="piece"]');
+    }
+    if (!piece) {
+        // Force board refresh if piece not found
+        setTimeout(() => location.reload(), 100);
+        return;
+    }
+    
+    if (piece) {
+        // Remove captured piece if any
+        const capturedPiece = toSquare.querySelector('.piece');
+        if (capturedPiece) {
+            addToCapturedPieces(capturedPiece);
+            capturedPiece.remove();
+        }
+        
+        // Handle en passant capture (captured pawn is on adjacent square, not destination)
+        if (piece.dataset.type === 'pawn' && Math.abs(parseInt(toX) - parseInt(fromX)) === 1) {
+            const fromYNum = parseInt(fromY);
+            const toYNum = parseInt(toY);
+            const isWhitePawn = piece.dataset.color === 'white';
+            
+            // Check if this is an en passant capture (diagonal move to empty square)
+            if (!capturedPiece) {
+                // For white pawns, captured pawn is one square behind destination
+                // For black pawns, captured pawn is one square behind destination
+                const capturedPawnX = toX;
+                const capturedPawnY = isWhitePawn ? (toY - 1) : (toY + 1);
+                
+                const capturedPawnSquare = document.querySelector(`[data-x="${capturedPawnX}"][data-y="${capturedPawnY}"]`);
+                const capturedPawn = capturedPawnSquare ? capturedPawnSquare.querySelector('.piece') : null;
+                
+                if (capturedPawn) {
+                    addToCapturedPieces(capturedPawn);
+                    capturedPawn.remove();
+                }
+            }
+        }
+        
+        // Move the piece
+        toSquare.appendChild(piece);
+        
+        // Handle pawn promotion if applicable
+        if (move.promotion_piece) {
+            handlePawnPromotion(move, toSquare, piece);
+        }
+    }
+}
+
+// Handle pawn promotion
+function handlePawnPromotion(move, toSquare, piece) {
+    if (move.promotion_piece) {
+        // Clear the destination square first (remove the pawn)
+        toSquare.innerHTML = '';
+        
+        // Create the promotion piece element
+        const promotionPiece = document.createElement('span');
+        promotionPiece.className = 'piece';
+        promotionPiece.dataset.color = piece.dataset.color;
+        promotionPiece.dataset.type = move.promotion_piece;
+        
+        // Set the piece symbol based on promotion type
+        const pieceSymbols = {
+            'queen': piece.dataset.color === 'white' ? '♕' : '♛',
+            'rook': piece.dataset.color === 'white' ? '♖' : '♜',
+            'bishop': piece.dataset.color === 'white' ? '♗' : '♝',
+            'knight': piece.dataset.color === 'white' ? '♘' : '♞'
+        };
+        promotionPiece.textContent = pieceSymbols[move.promotion_piece];
+        
+        // Add the promotion piece to the destination square
+        toSquare.appendChild(promotionPiece);
+    }
+}
+
+// Add move to history
+function addMoveToHistory(notation) {
+    const moveHistory = document.getElementById('move-history');
+    if (moveHistory && notation) {
+        const moveItem = document.createElement('div');
+        moveItem.className = 'move-item';
+        moveItem.textContent = notation;
+        moveHistory.appendChild(moveItem);
+        
+        // Scroll to the latest move
+        moveHistory.scrollTop = moveHistory.scrollHeight;
+    }
+}
+
+function addToCapturedPieces(piece) {
+    const color = piece.dataset.color;
+    const capturesDiv = document.getElementById(color === 'white' ? 'black-captures' : 'white-captures');
+    
+    const captureSpan = document.createElement('span');
+    captureSpan.className = 'captured-piece';
+    captureSpan.textContent = piece.textContent;
+    capturesDiv.appendChild(captureSpan);
+}
+
+function updateGameStatus(status, currentTurn, winner) {
+    gameStatus = status;
+    currentPlayer = currentTurn;
+    
+    const statusDiv = document.getElementById('status-message');
+    statusDiv.className = 'status-message';
+    
+    if (status === 'active') {
+        statusDiv.classList.add('status-active');
+        statusDiv.textContent = `${currentTurn.charAt(0).toUpperCase() + currentTurn.slice(1)}'s turn to move`;
+    } else if (status === 'check') {
+        statusDiv.classList.add('status-check');
+        statusDiv.textContent = `${currentTurn.charAt(0).toUpperCase() + currentTurn.slice(1)} is in CHECK!`;
+    } else if (status === 'checkmate') {
+        statusDiv.classList.add('status-checkmate');
+        statusDiv.textContent = `CHECKMATE! ${winner} wins!`;
+        highlightKings(currentTurn);
+    } else if (status === 'resigned') {
+        statusDiv.classList.add('status-checkmate');
+        statusDiv.textContent = `${currentTurn === 'white' ? '{{ game.white_player.full_name }}' : '{{ game.black_player.full_name }}'} loses by resignation!`;
+        highlightKings(currentTurn);
+    } else if (status === 'draw') {
+        statusDiv.classList.add('status-draw');
+        statusDiv.textContent = 'DRAW! Game ends in a draw.';
+        highlightDrawKings()
+    } else if (status === 'stalemate') {
+        statusDiv.classList.add('status-stalemate');
+        statusDiv.textContent = 'STALEMATE! Game is a draw.';
+        highlightKings(currentTurn);
+    }
+}
+
+function highlightKings(currentTurn) {
+    const kings = document.querySelectorAll('.piece[data-type="king"]');
+    kings.forEach(king => {
+        const square = king.parentElement;
+        
+        if (king.dataset.color === currentTurn) {
+            square.style.background = 'linear-gradient(135deg, #ff6b6b 0%, #c92a2a 100%)';
+        } else {
+            square.style.background = 'linear-gradient(135deg, #51cf66 0%, #2b8a3e 100%)';
+        }
+    });
+}
+
+function highlightDrawKings() {
+    const kings = document.querySelectorAll('.piece[data-type="king"]');
+    kings.forEach(king => {
+        const square = king.parentElement;
+        // Yellow background for both kings in draw
+        square.style.background = 'linear-gradient(135deg, #ffeb3b 0%, #ffc107 100%)';
+    });
+}
+
+function addMoveToHistory(notation) {
+    const tableBody = document.getElementById('move-history-tbody');
+    
+    // Get current player from status message since window.currentPlayer is undefined
+    const statusElement = document.getElementById('status-message');
+    const statusText = statusElement.textContent;
+    
+    // Determine who made the move by checking who's turn it is NOW
+    // If it's White's turn now, then Black just moved
+    const currentPlayer = statusText.includes('White') ? 'black' : 'white';
+    
+    // Count existing moves in the table to determine move number
+    let existingMoves = 0;
+    for (let row of tableBody.children) {
+        if (row.cells[1].textContent) existingMoves++; // Count white moves
+        if (row.cells[2].textContent) existingMoves++; // Count black moves
+    }
+    
+    // Move number is based on pairs of moves (1 pair = move number 1, etc.)
+    const moveNumber = Math.floor(existingMoves / 2) + 1;
+    
+    let targetRow = null;
+    
+    // Look for existing row with this move number
+    for (let row of tableBody.children) {
+        if (row.cells[0] && row.cells[0].textContent.trim() === moveNumber + '.') {
+            targetRow = row;
+            break;
+        }
+    }
+    
+    // If no row exists, create a new one
+    if (!targetRow) {
+        targetRow = tableBody.insertRow();
+        targetRow.insertCell(0).textContent = moveNumber + '.';
+        targetRow.insertCell(1).textContent = '';
+        targetRow.insertCell(2).textContent = '';
+    }
+    
+    // Add notation to appropriate column
+    if (currentPlayer === 'white') {
+        targetRow.cells[1].textContent = notation;
+    } else {
+        targetRow.cells[2].textContent = notation;
+    }
+    
+    // Scroll to bottom to show the newest move
+    const moveHistoryContainer = document.querySelector('.move-history');
+    if (moveHistoryContainer) {
+        moveHistoryContainer.scrollTop = moveHistoryContainer.scrollHeight;
+    }
+}
+
+// REMOVED - consolidated into single DOMContentLoaded listener above
+
+function populateExistingMoves() {
+    // Get existing moves from global variable set by Django template
+    const existingMoves = window.existingMoves || [];
+    
+    if (existingMoves && existingMoves.length > 0) {
+        existingMoves.forEach(move => {
+            addMoveToHistoryWithNumber(move.notation, move.move_number);
+        });
+    }
+}
+
+function addMoveToHistoryWithNumber(notation, moveNumber) {
+    const tableBody = document.getElementById('move-history-tbody');
+    
+    // For existing moves from database, we need to determine the player differently
+    // We'll look at the existing table structure to see where this move should go
+    let targetRow = null;
+    
+    // Look for existing row with this move number
+    for (let row of tableBody.children) {
+        if (row.cells[0] && row.cells[0].textContent.trim() === moveNumber + '.') {
+            targetRow = row;
+            break;
+        }
+    }
+    
+    // If no row exists, create one
+    if (!targetRow) {
+        targetRow = tableBody.insertRow();
+        targetRow.insertCell(0); // Move number
+        targetRow.insertCell(1); // White move
+        targetRow.insertCell(2); // Black move
+        targetRow.cells[0].textContent = moveNumber + '.';
+    }
+    
+    // Check which column is empty for this move number
+    // If white column is empty, this is a white move
+    // If white column is filled but black is empty, this is a black move
+    if (!targetRow.cells[1].textContent) {
+        targetRow.cells[1].textContent = notation;
+    } else if (!targetRow.cells[2].textContent) {
+        targetRow.cells[2].textContent = notation;
+    } else {
+        // Both columns are filled, create a new row
+        const newMoveNumber = moveNumber + 1;
+        const newRow = tableBody.insertRow();
+        newRow.insertCell(0); // Move number
+        newRow.insertCell(1); // White move
+        newRow.insertCell(2); // Black move
+        newRow.cells[0].textContent = newMoveNumber + '.';
+        newRow.cells[1].textContent = notation;
+    }
+}
+
+// Set existing moves from Django context
+window.existingMoves = {{ moves_json|safe }};
+
+async function startGame() {
+    try {
+        const response = await fetch(`/game/${gameId}/start/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrfToken(),
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            location.reload();
+        }
+    } catch (error) {
+        console.error('Error starting game:', error);
+        alert('Error starting game');
+    }
+}
+
+function getCsrfToken() {
+    const cookie = document.cookie.split('; ').find(row => row.startsWith('csrftoken='));
+    return cookie ? cookie.split('=')[1] : '';
+}
+
+async function checkForCheck(gameStatus = null, currentTurn = null, winner = null) {
+    try {
+        let data;
+        
+        // If game status is provided, use it directly (for immediate updates after moves)
+        if (gameStatus !== null) {
+            data = {
+                status: 'success',
+                game_status: gameStatus,
+                current_turn: currentTurn,
+                winner: winner,
+                is_in_check: gameStatus === 'check' || gameStatus === 'checkmate' || gameStatus === 'draw' || gameStatus === 'stalemate'
+            };
+        } else {
+            // Otherwise fetch from server (for page loads and periodic checks)
+            const response = await fetch(`/game/${gameId}/check-status/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCsrfToken()
+                },
+                body: JSON.stringify({})
+            });
+            
+            data = await response.json();
+        }
+        
+        if (data.status === 'success') {
+                // Clear any existing check indicators
+                document.querySelectorAll('.check-indicator').forEach(indicator => {
+                    indicator.remove();
+                });
+                
+                // Clear any existing stalemate cell indicators
+                document.querySelectorAll('.stalemate-cell').forEach(cell => {
+                    cell.classList.remove('stalemate-cell');
+                });
+                
+                // Clear any existing king cell backgrounds
+                document.querySelectorAll('.square').forEach(square => {
+                    square.style.background = '';
+                });
+                
+                // Check for checkmate first (takes precedence)
+                if (data.game_status === 'checkmate') {
+                    const kingSquares = document.querySelectorAll('.piece');
+                    kingSquares.forEach(square => {
+                        const piece = square; // square is already the piece element
+                        if (piece && piece.textContent.includes('♔') && data.current_turn === 'white' ||
+                            piece.textContent.includes('♚') && data.current_turn === 'black') {
+                            // Add red bubble with 'x' for checkmated king
+                            const checkmateIndicator = document.createElement('div');
+                            checkmateIndicator.className = 'check-indicator checkmate-king';
+                            checkmateIndicator.textContent = 'x';
+                            square.appendChild(checkmateIndicator);
+                        } else if (piece && piece.textContent.includes('♔') && data.current_turn === 'black' ||
+                                   piece.textContent.includes('♚') && data.current_turn === 'white') {
+                            // Add green bubble with '*' for winning king
+                            const winnerIndicator = document.createElement('div');
+                            winnerIndicator.className = 'check-indicator winner-king';
+                            winnerIndicator.textContent = '*';
+                            square.appendChild(winnerIndicator);
+                        }
+                    });
+                    
+                    // Update game status to show checkmate
+                    updateGameStatus('checkmate', data.current_turn, data.winner);
+                }
+                // Check for resignation
+                else if (data.game_status === 'resigned') {
+                    const kingSquares = document.querySelectorAll('.piece');
+                    kingSquares.forEach(square => {
+                        const piece = square; // square is already the piece element
+                        // White king (♔) gets red if current turn is white (white resigned)
+                        if (piece && piece.textContent.includes('♔') && data.current_turn === 'white') {
+                            // Add red bubble with 'x' for resigning king
+                            const resignIndicator = document.createElement('div');
+                            resignIndicator.className = 'check-indicator checkmate-king';
+                            resignIndicator.textContent = 'x';
+                            square.appendChild(resignIndicator);
+                        }
+                        // Black king (♚) gets green if current turn is white (black wins)
+                        else if (piece && piece.textContent.includes('♚') && data.current_turn === 'white') {
+                            // Add green bubble with '✓' for winning king
+                            const winnerIndicator = document.createElement('div');
+                            winnerIndicator.className = 'check-indicator winner-king';
+                            winnerIndicator.textContent = '✓';
+                            square.appendChild(winnerIndicator);
+                        }
+                        // Black king (♚) gets red if current turn is black (black resigned)
+                        else if (piece && piece.textContent.includes('♚') && data.current_turn === 'black') {
+                            // Add red bubble with 'x' for resigning king
+                            const resignIndicator = document.createElement('div');
+                            resignIndicator.className = 'check-indicator checkmate-king';
+                            resignIndicator.textContent = 'x';
+                            square.appendChild(resignIndicator);
+                        }
+                        // White king (♔) gets green if current turn is black (white wins)
+                        else if (piece && piece.textContent.includes('♔') && data.current_turn === 'black') {
+                            // Add green bubble with '✓' for winning king
+                            const winnerIndicator = document.createElement('div');
+                            winnerIndicator.className = 'check-indicator winner-king';
+                            winnerIndicator.textContent = '✓';
+                            square.appendChild(winnerIndicator);
+                        }
+                    });
+                    
+                    // Update game status to show resignation
+                    updateGameStatus('resigned', data.current_turn, data.winner);
+                }
+                // Then check for draw
+                else if (data.game_status === 'draw') {
+                    const kingSquares = document.querySelectorAll('.piece');
+                    kingSquares.forEach(square => {
+                        const piece = square; // square is already the piece element
+                        if (piece && (piece.textContent.includes('♔') || piece.textContent.includes('♚'))) {
+                            // Add yellow bubble with '!' for draw on both kings
+                            const drawIndicator = document.createElement('div');
+                            drawIndicator.className = 'check-indicator stalemate-king';
+                            drawIndicator.textContent = '!';
+                            square.appendChild(drawIndicator);
+                            
+                            // Add yellow background to king's square
+                            const kingSquare = square.parentElement;
+                            kingSquare.style.background = 'linear-gradient(135deg, #ffeb3b 0%, #ffc107 100%)';
+                        }
+                    });
+                    
+                    // Update game status to show draw
+                    updateGameStatus('draw', data.current_turn, null);
+                }
+                // Then check for stalemate
+                else if (data.game_status === 'stalemate') {
+                    const kingSquares = document.querySelectorAll('.piece');
+                    kingSquares.forEach(square => {
+                        const piece = square; // square is already the piece element
+                        if (piece && (piece.textContent.includes('♔') || piece.textContent.includes('♚'))) {
+                            // Add yellow bubble with '!' for stalemate on both kings
+                            const stalemateIndicator = document.createElement('div');
+                            stalemateIndicator.className = 'check-indicator stalemate-king';
+                            stalemateIndicator.textContent = '!';
+                            square.appendChild(stalemateIndicator);
+                            
+                            // Add orange background to king's square
+                            const kingSquare = square.parentElement;
+                            kingSquare.classList.add('stalemate-cell');
+                        }
+                    });
+                    
+                    // Update game status to show stalemate
+                    updateGameStatus('stalemate', data.current_turn, null);
+                }
+                // Then check for regular check
+                else if (data.game_status === 'check') {
+                    const kingSquares = document.querySelectorAll('.piece');
+                    kingSquares.forEach(square => {
+                        const piece = square; // square is already the piece element
+                        // Check the current player's king (the one who is now in check and must move)
+                        if (piece && piece.textContent.includes('♔') && data.current_turn === 'white' ||
+                            piece.textContent.includes('♚') && data.current_turn === 'black') {
+                            // Add orange bubble with '!' for checked king
+                            const checkIndicator = document.createElement('div');
+                            checkIndicator.className = 'check-indicator checked-king';
+                            checkIndicator.textContent = '!';
+                            square.appendChild(checkIndicator);
+                        }
+                    });
+                    
+                    // Update game status to show check
+                    updateGameStatus('check', data.current_turn, data.winner);
+                }
+                
+                // Check for draw offers when turn changes
+                await checkForDrawOffer();
+            }
+    } catch (error) {
+        console.error('Error checking game status:', error);
+    }
+}
+
+// Handle resign functionality
+async function handleResign() {
+    if (!confirm('Are you sure you want to resign?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/game/${gameId}/resign/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrfToken()
+            },
+            body: JSON.stringify({})
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            // Reload page to show updated game status
+            location.reload();
+        } else {
+            alert('Error resigning: ' + (data.message || 'Unknown error'));
+        }
+    } catch (error) {
+        console.error('Error resigning:', error);
+        alert('Error resigning: ' + error.message);
+    }
+}
+
+// Handle draw offer functionality
+async function handleDraw() {
+    try {
+        const response = await fetch(`/game/${gameId}/draw/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrfToken()
+            },
+            body: JSON.stringify({ action: 'offer' })
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            if (data.action === 'offered') {
+                alert('Draw offer sent to opponent!');
+                // Update current turn and status
+                currentPlayer = data.current_turn;
+                updateGameStatus('active', data.current_turn, null);
+                // Check for draw offers immediately for the opponent
+                checkForDrawOffer();
+            } else if (data.action === 'accepted') {
+                // Reload page to show updated game status
+                location.reload();
+            } else if (data.action === 'denied') {
+                alert('Draw offer was denied by opponent!');
+            }
+        } else {
+            alert('Error offering draw: ' + (data.message || 'Unknown error'));
+        }
+    } catch (error) {
+        console.error('Error offering draw:', error);
+        alert('Error offering draw: ' + error.message);
+    }
+}
+
+// Check for draw offers when turn changes
+async function checkForDrawOffer() {
+    try {
+        const response = await fetch(`/game/${gameId}/check-draw-offer/`);
+        const data = await response.json();
+        
+        if (data.status === 'success' && data.has_offer) {
+            // Show popup to accept/deny draw
+            const acceptDraw = confirm(`${data.offering_player} offers a draw. Click OK to accept, Cancel to deny.`);
+            
+            if (acceptDraw) {
+                // Accept draw
+                await handleDrawResponse('accept');
+            } else {
+                // Deny draw
+                await handleDrawResponse('deny');
+            }
+        }
+    } catch (error) {
+        console.error('Error checking draw offer:', error);
+    }
+}
+
+// Periodic check for draw offers (every 5 seconds)
+setInterval(async () => {
+    try {
+        const response = await fetch(`/game/${gameId}/check-draw-offer/`);
+        const data = await response.json();
+        
+        if (data.status === 'success' && data.has_offer) {
+            // Show popup to accept/deny draw
+            const acceptDraw = confirm(`${data.offering_player} offers a draw. Click OK to accept, Cancel to deny.`);
+            
+            if (acceptDraw) {
+                // Accept draw
+                await handleDrawResponse('accept');
+            } else {
+                // Deny draw
+                await handleDrawResponse('deny');
+            }
+        }
+    } catch (error) {
+        // Silently ignore network errors for draw offer polling
+        // These errors are common and don't affect gameplay
+        if (error.name === 'TypeError' && error.message.includes('NetworkError')) {
+            // Network errors are expected, don't log them
+        } else {
+            console.error('Unexpected error checking draw offer:', error);
+        }
+    }
+}, 5000);
+
+// Handle draw response (accept/deny)
+async function handleDrawResponse(action) {
+    try {
+        const response = await fetch(`/game/${gameId}/draw/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrfToken()
+            },
+            body: JSON.stringify({ action: action })
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            if (data.action === 'accepted') {
+                // Reload page to show stalemate
+                location.reload();
+            } else if (data.action === 'denied') {
+                alert('Draw offer denied. Game continues.');
+                // Update current turn if returned from backend
+                if (data.current_turn) {
+                    currentPlayer = data.current_turn;
+                    updateGameStatus('active', data.current_turn, null);
+                }
+            }
+        } else {
+            alert('Error responding to draw: ' + (data.message || 'Unknown error'));
+        }
+    } catch (error) {
+        console.error('Error responding to draw:', error);
+        alert('Error responding to draw: ' + error.message);
+    }
+}
+
+// REMOVED - consolidated into single DOMContentLoaded listener above
+</script>
+{% endblock %}
