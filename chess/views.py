@@ -48,8 +48,9 @@ def create_game(request: HttpRequest) -> HttpResponse:
     - GET: Display the game creation form
     - POST: Process form data and create a new game with players
 
-    Creates or updates players with the provided names and assigns
-    them to white and black pieces. Then creates a new game instance.
+    Creates or updates players with the provided names and randomly assigns
+    them to white and black pieces based on random color assignment.
+    Then creates a new game instance.
 
     Args:
         request: HTTP request object containing form data.
@@ -58,13 +59,26 @@ def create_game(request: HttpRequest) -> HttpResponse:
         HttpResponse: Game creation form (GET) or redirect to game (POST).
     """
     if request.method == 'POST':
-        # Get player names from form
-        white_first_name = request.POST.get('white_first_name', 'White')
-        white_last_name = request.POST.get('white_last_name', 'Player')
-        black_first_name = request.POST.get('black_first_name', 'Black')
-        black_last_name = request.POST.get('black_last_name', 'Player')
+        # Get player names from form (without color specification)
+        player1_first_name = request.POST.get('player1_first_name', 'Player')
+        player1_last_name = request.POST.get('player1_last_name', 'One')
+        player2_first_name = request.POST.get('player2_first_name', 'Player')
+        player2_last_name = request.POST.get('player2_last_name', 'Two')
         
-        # Get or create players with provided names
+        # Randomly assign colors to players
+        import random
+        player1_is_white = random.choice([True, False])
+        
+        if player1_is_white:
+            # Player 1 is white, Player 2 is black
+            white_first_name, white_last_name = player1_first_name, player1_last_name
+            black_first_name, black_last_name = player2_first_name, player2_last_name
+        else:
+            # Player 1 is black, Player 2 is white
+            white_first_name, white_last_name = player2_first_name, player2_last_name
+            black_first_name, black_last_name = player1_first_name, player1_last_name
+        
+        # Get or create players with assigned colors
         white_player, _ = Player.objects.get_or_create(
             color='white',
             defaults={
@@ -89,12 +103,24 @@ def create_game(request: HttpRequest) -> HttpResponse:
         black_player.last_name = black_last_name
         black_player.save()
         
-        # Create game with descriptive name
+        # Create game with descriptive name showing color assignment
         game = Game.objects.create(
             white_player=white_player,
             black_player=black_player,
             name=f"{white_player.full_name} (white) vs {black_player.full_name} (black)"
         )
+        
+        # Store color assignment info in session for display
+        request.session['color_assignment'] = {
+            'player1': {
+                'name': f"{player1_first_name} {player1_last_name}",
+                'color': 'white' if player1_is_white else 'black'
+            },
+            'player2': {
+                'name': f"{player2_first_name} {player2_last_name}",
+                'color': 'black' if player1_is_white else 'white'
+            }
+        }
         
         return redirect('chess:game', game_id=game.id)
     
@@ -155,7 +181,8 @@ def game_view(request: HttpRequest, game_id: int) -> HttpResponse:
         'pieces': pieces,
         'captured_pieces': captured_pieces,
         'moves': moves,
-        'moves_json': json.dumps(moves_data)
+        'moves_json': json.dumps(moves_data),
+        'color_assignment': request.session.pop('color_assignment', None)
     }
     
     return render(request, 'chess/game.html', context)

@@ -75,6 +75,16 @@ python manage.py runserver
 
 Visit `http://localhost:8000/` to access the chess game.
 
+### 4. Creating a New Game
+
+1. Navigate to the "Create New Game" page
+2. Enter player names (Player 1 and Player 2) without specifying colors
+3. Optionally click the "🎲 Randomize Colors" button for a preview
+4. Click "Create New Game" to randomly assign colors and start playing
+5. The game will display which player got white and which got black pieces
+
+**Note**: Colors are assigned randomly with a 50/50 probability for each player, ensuring fair play.
+
 ## 🏗️ Project Structure
 
 ```
@@ -211,6 +221,14 @@ chess_game/
 - Player information display
 - Game status indicators
 - Responsive design for various screen sizes
+
+### Game Creation Features
+
+- **Random Color Assignment**: Players enter names without specifying colors
+- **Automatic Color Assignment**: System randomly assigns white/black pieces to players
+- **Visual Color Display**: Shows which player got which color with styled badges
+- **Fair Play**: 50/50 chance for each player to get white or black pieces
+- **Enhanced UX**: "🎲 Randomize Colors" button for interactive experience
 
 ## 🔧 Configuration
 
@@ -450,6 +468,9 @@ For support and questions:
 - Review the Django documentation
 
 ## 🔮 Future Enhancements
+
+Recently Implemented Features:
+- ✅ **Random Color Assignment**: Enhanced game creation with automatic color assignment
 
 Planned features include:
 

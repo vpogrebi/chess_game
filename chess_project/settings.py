@@ -80,20 +80,37 @@ WSGI_APPLICATION = 'chess_project.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
-# Always use test database for this project
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'test_chess_db',
-        'USER': 'chess_user',
-        'PASSWORD': 'chess_password',
-        'HOST': 'localhost',
-        'PORT': '5432',
-        'TEST': {
-            'NAME': 'test_chess_db',  # Use same database for tests
+import os
+import sys
+
+# Use different database based on whether we're testing or running development server
+if 'test' in sys.argv or 'test' in os.environ.get('DJANGO_SETTINGS_MODULE', ''):
+    # Testing mode - use test database
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': 'test_chess_db',
+            'USER': 'chess_user',
+            'PASSWORD': 'chess_password',
+            'HOST': 'localhost',
+            'PORT': '5432',
+            'TEST': {
+                'NAME': 'test_chess_db',  # Use same database for tests
+            }
         }
     }
-}
+else:
+    # Development mode - use development database
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': 'chess_db',
+            'USER': 'chess_user',
+            'PASSWORD': 'chess_password',
+            'HOST': 'localhost',
+            'PORT': '5432',
+        }
+    }
 
 
 # Password validation

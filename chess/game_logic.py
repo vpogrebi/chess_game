@@ -15,6 +15,7 @@ Key features:
 
 """
 
+from typing import Optional
 from .models import Game, ChessPiece, Move, Player, CapturedPiece
 from django.utils import timezone
 
@@ -38,20 +39,17 @@ class ChessGameLogic:
         """
         self.game = game
     
-    def get_piece_at(self, x: int, y: int) -> ChessPiece | None:
-        """Get the piece at a specific board position.
+    def get_piece_at(self, x: int, y: int) -> Optional[ChessPiece]:
+        """Get piece at specific position.
         
         Args:
-            x: X coordinate (0-7, representing a-h).
-            y: Y coordinate (0-7, representing 1-8).
+            x: X coordinate (0-7)
+            y: Y coordinate (0-7)
             
         Returns:
-            ChessPiece: The piece at the position, or None if empty.
+            ChessPiece object or None if no piece at position
         """
-        try:
-            return ChessPiece.objects.get(game=self.game, position_x=x, position_y=y, is_captured=False)
-        except ChessPiece.DoesNotExist:
-            return None
+        return ChessPiece.objects.filter(game=self.game, position_x=x, position_y=y, is_captured=False).first()
     
     def is_valid_position(self, x: int, y: int) -> bool:
         """Check if a position is within the chess board bounds.
