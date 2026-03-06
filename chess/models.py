@@ -348,8 +348,8 @@ class CapturedPiece(models.Model):
     
     def __str__(self) -> str:
         """Return string representation of the captured piece.
-
+        
         Returns:
             str: Description of the capture event.
         """
-        return f"{self.piece} captured by {self.captured_by.name}"
+        return f"{self.piece} captured by {self.captured_by.full_name}"

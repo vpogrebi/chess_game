@@ -524,6 +524,57 @@
     <div class="info-section">
         <div class="game-info">
             <h3>{{ game.name }}</h3>
+            
+            {% if color_assignment %}
+                <div class="color-assignment" style="
+                    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+                    border: 1px solid #dee2e6;
+                    border-radius: 8px;
+                    padding: 15px;
+                    margin: 15px 0;
+                    text-align: center;
+                ">
+                    <h4 style="color: #2c3e50; margin: 0 0 10px 0; font-size: 1.1em;">
+                        🎲 Color Assignment
+                    </h4>
+                    <div style="display: flex; justify-content: space-around; align-items: center;">
+                        <div style="text-align: center;">
+                            <div style="font-weight: bold; color: #2c3e50; margin-bottom: 5px;">
+                                {{ color_assignment.player1.name }}
+                            </div>
+                            <div class="color-badge {% if color_assignment.player1.color == 'white' %}white-badge{% else %}black-badge{% endif %}">
+                                {{ color_assignment.player1.color|title }}
+                            </div>
+                        </div>
+                        <div style="font-size: 1.5em; color: #667eea;">VS</div>
+                        <div style="text-align: center;">
+                            <div style="font-weight: bold; color: #2c3e50; margin-bottom: 5px;">
+                                {{ color_assignment.player2.name }}
+                            </div>
+                            <div class="color-badge {% if color_assignment.player2.color == 'white' %}white-badge{% else %}black-badge{% endif %}">
+                                {{ color_assignment.player2.color|title }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <style>
+                .color-badge {
+                    padding: 5px 10px;
+                    border-radius: 5px;
+                    font-weight: bold;
+                }
+                .white-badge {
+                    background: #ffffff; 
+                    color: #2c3e50; 
+                    border: 1px solid #dee2e6;
+                }
+                .black-badge {
+                    background: #2c3e50; 
+                    color: #ffffff;
+                }
+                </style>
+            {% endif %}
+            
             {% if game.status == 'waiting' %}
                 <button id="start-game-btn" class="btn" style="width: 100%; margin-top: 15px;">
                     Start Game
