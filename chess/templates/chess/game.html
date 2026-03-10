@@ -35,6 +35,20 @@
         overflow: hidden;
         box-shadow: 0 15px 40px rgba(0,0,0,0.3);
         flex-shrink: 0; /* Prevent shrinking */
+        transition: transform 0.6s cubic-bezier(0.4, 0.0, 0.2, 1);
+    }
+    
+    .chess-board.black-to-move {
+        transform: rotate(180deg);
+    }
+    
+    .chess-board.white-to-move {
+        transform: rotate(0deg);
+    }
+    
+    /* When board is rotated, pieces rotate to stay upright */
+    .chess-board.black-to-move .piece {
+        transform: rotate(180deg);
     }
     
     .square {
@@ -486,6 +500,27 @@
         background: linear-gradient(135deg, #f57c00 0%, #e65100 100%);
         transform: translateY(-2px);
     }
+    
+    .btn:disabled,
+    .btn.disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        transform: none;
+        background: #cccccc;
+        color: #666666;
+    }
+    
+    .btn-danger:disabled,
+    .btn-danger.disabled {
+        background: #cccccc;
+        color: #666666;
+    }
+    
+    .btn-warning:disabled,
+    .btn-warning.disabled {
+        background: #cccccc;
+        color: #666666;
+    }
 </style>
 {% endblock %}
 
@@ -494,11 +529,16 @@
     <div class="board-section">
         <div class="board-wrapper">
             <div class="rank-labels">
-                <span>8</span><span>7</span><span>6</span><span>5</span>
-                <span>4</span><span>3</span><span>2</span><span>1</span>
+                {% if game.current_turn == 'white' %}
+                    <span>8</span><span>7</span><span>6</span><span>5</span>
+                    <span>4</span><span>3</span><span>2</span><span>1</span>
+                {% else %}
+                    <span>1</span><span>2</span><span>3</span><span>4</span>
+                    <span>5</span><span>6</span><span>7</span><span>8</span>
+                {% endif %}
             </div>
             <div>
-                <div class="chess-board" id="chess-board">
+                <div class="chess-board {% if game.current_turn == 'white' %}white-to-move{% else %}black-to-move{% endif %}" id="chess-board">
                     {% for row in board %}
                         {% for cell in row %}
                             <div class="square {% if forloop.counter0|divisibleby:2 == forloop.parentloop.counter0|divisibleby:2 %}light{% else %}dark{% endif %}" 
@@ -514,8 +554,13 @@
                     {% endfor %}
                 </div>
                 <div class="coordinates">
-                    <span>a</span><span>b</span><span>c</span><span>d</span>
-                    <span>e</span><span>f</span><span>g</span><span>h</span>
+                    {% if game.current_turn == 'white' %}
+                        <span>a</span><span>b</span><span>c</span><span>d</span>
+                        <span>e</span><span>f</span><span>g</span><span>h</span>
+                    {% else %}
+                        <span>h</span><span>g</span><span>f</span><span>e</span>
+                        <span>d</span><span>c</span><span>b</span><span>a</span>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -652,12 +697,16 @@
 
 {% block extra_js %}
 <script>
-const gameId = {{ game.id }};
-let selectedSquare = null;
 let currentPlayer = '{{ game.current_turn }}';
 let gameStatus = '{{ game.status }}';
-let pendingMove = null;
-let board = null; // Global board variable
+let gameId = {{ game.id }};
+let selectedPiece = null;
+let selectedSquare = null;
+let validMoves = [];
+let gameInProgress = false;
+
+// Track if draw offer popup is currently showing to prevent duplicates
+let drawOfferPopupShowing = false;
 
 // Initialize board function
 function initializeBoard() {
@@ -1103,6 +1152,14 @@ function updateGameStatus(status, currentTurn, winner) {
     gameStatus = status;
     currentPlayer = currentTurn;
     
+    // Only update board rotation if game is still active (not checkmate, stalemate, draw, or resigned)
+    if (status === 'active' || status === 'check') {
+        updateBoardRotation(currentTurn);
+    }
+    
+    // Update button states based on game status
+    updateGameControlButtons(status);
+    
     const statusDiv = document.getElementById('status-message');
     statusDiv.className = 'status-message';
     
@@ -1128,6 +1185,47 @@ function updateGameStatus(status, currentTurn, winner) {
         statusDiv.classList.add('status-stalemate');
         statusDiv.textContent = 'STALEMATE! Game is a draw.';
         highlightKings(currentTurn);
+    }
+}
+
+function updateGameControlButtons(status) {
+    const resignBtn = document.getElementById('resign-btn');
+    const drawBtn = document.getElementById('draw-btn');
+    
+    if (resignBtn && drawBtn) {
+        if (status === 'active' || status === 'check') {
+            // Enable buttons for active games
+            resignBtn.disabled = false;
+            drawBtn.disabled = false;
+            resignBtn.classList.remove('disabled');
+            drawBtn.classList.remove('disabled');
+        } else {
+            // Disable buttons for ended games
+            resignBtn.disabled = true;
+            drawBtn.disabled = true;
+            resignBtn.classList.add('disabled');
+            drawBtn.classList.add('disabled');
+        }
+    }
+}
+
+function updateBoardRotation(currentTurn) {
+    const chessBoard = document.getElementById('chess-board');
+    const rankLabels = document.querySelector('.rank-labels');
+    const coordinates = document.querySelector('.coordinates');
+    
+    // Update board rotation classes
+    chessBoard.classList.remove('white-to-move', 'black-to-move');
+    if (currentTurn === 'white') {
+        chessBoard.classList.add('white-to-move');
+        // Update coordinates for white's turn
+        rankLabels.innerHTML = '<span>8</span><span>7</span><span>6</span><span>5</span><span>4</span><span>3</span><span>2</span><span>1</span>';
+        coordinates.innerHTML = '<span>a</span><span>b</span><span>c</span><span>d</span><span>e</span><span>f</span><span>g</span><span>h</span>';
+    } else {
+        chessBoard.classList.add('black-to-move');
+        // Update coordinates for black's turn
+        rankLabels.innerHTML = '<span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span>';
+        coordinates.innerHTML = '<span>h</span><span>g</span><span>f</span><span>e</span><span>d</span><span>c</span><span>b</span><span>a</span>';
     }
 }
 
@@ -1544,8 +1642,9 @@ async function checkForDrawOffer() {
         const response = await fetch(`/game/${gameId}/check-draw-offer/`);
         const data = await response.json();
         
-        if (data.status === 'success' && data.has_offer) {
+        if (data.status === 'success' && data.has_offer && !drawOfferPopupShowing) {
             // Show popup to accept/deny draw
+            drawOfferPopupShowing = true;  // Set flag to prevent duplicates
             const acceptDraw = confirm(`${data.offering_player} offers a draw. Click OK to accept, Cancel to deny.`);
             
             if (acceptDraw) {
@@ -1555,6 +1654,9 @@ async function checkForDrawOffer() {
                 // Deny draw
                 await handleDrawResponse('deny');
             }
+            
+            // Reset flag after handling response
+            drawOfferPopupShowing = false;
         }
     } catch (error) {
         console.error('Error checking draw offer:', error);
@@ -1567,8 +1669,9 @@ setInterval(async () => {
         const response = await fetch(`/game/${gameId}/check-draw-offer/`);
         const data = await response.json();
         
-        if (data.status === 'success' && data.has_offer) {
+        if (data.status === 'success' && data.has_offer && !drawOfferPopupShowing) {
             // Show popup to accept/deny draw
+            drawOfferPopupShowing = true;  // Set flag to prevent duplicates
             const acceptDraw = confirm(`${data.offering_player} offers a draw. Click OK to accept, Cancel to deny.`);
             
             if (acceptDraw) {
@@ -1578,6 +1681,9 @@ setInterval(async () => {
                 // Deny draw
                 await handleDrawResponse('deny');
             }
+            
+            // Reset flag after handling response
+            drawOfferPopupShowing = false;
         }
     } catch (error) {
         // Silently ignore network errors for draw offer polling
